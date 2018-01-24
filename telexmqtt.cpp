@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2014 Scott Vokes <vokes.s@gmail.com>
+ * Telex Code - Copyright (c) 2018 Marc and Dario Buma <mosbuma@bumos.nl>
+ * MQTT Demo - Copyright (c) 2014 Scott Vokes <vokes.s@gmail.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,6 +75,8 @@ static void print_usage(const char *prog)
 	printf("Usage: %s [-npDh]\n", prog);
 	puts("  -n --hostname : mqtt host IP or name\n"
 	     "  -p --port : mqtt port on host\n"
+       "  -u --user : mqtt username (omit to login anonymously)\n"
+       "  -P --pass : mqtt password\n"
        "  -d --dummy : dummy telex mode: send messages to console\n"
   		 "  -h --help : display this message\n");
 	exit(1);
@@ -86,12 +89,17 @@ char *hostname;
 int port;
 int dummyMode=0;
 
+char *username;
+char *password;
+
 static void parse_opts(int argc, char *argv[])
 {
 	static const struct option lopts[] = {
 		{ "hostname", required_argument, 0, 'n' },
 		{ "port", required_argument, 0, 'p' },
     { "dummy", no_argument, 0, 'd' },
+    { "user", no_argument, 0, 'u' },
+    { "pass", no_argument, 0, 'P' },
 		{ "help", no_argument, 0, 'h' },
 		{ NULL, 0, 0, 0 }
 	};
@@ -100,7 +108,7 @@ static void parse_opts(int argc, char *argv[])
 
 	while (1)
 	{
-		c = getopt_long(argc, argv, "n:p:dh", lopts, NULL);
+		c = getopt_long(argc, argv, "n:p:u:P:dh", lopts, NULL);
 		if (c==-1)
 		{
       if(hostname==0||port==0) {
@@ -122,6 +130,12 @@ static void parse_opts(int argc, char *argv[])
 				break;
       case 'd':
         dummyMode=1;
+				break;
+      case 'u':
+        username=optarg;
+				break;
+      case 'P':
+        password=optarg;
 				break;
 			case 'h':
 			default:
@@ -155,8 +169,14 @@ int main(int argc, char **argv) {
     info.pid = pid;
 
     struct mosquitto *m = init(&info);
+
     if (m == NULL) { die("init() failure\n"); }
     info.m = m;
+
+    if(0!=username) {
+      printf("Setting username to '%s'\n", username);
+      mosquitto_username_pw_set(m, username, password);
+    }
 
     if (!set_callbacks(m)) { die("set_callbacks() failure\n"); }
 
