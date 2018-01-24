@@ -1,5 +1,0 @@
-#!/bin/sh
-while true; do
-    echo tick
-    sleep 1
-done | mosquitto_pub -l -t "tick"

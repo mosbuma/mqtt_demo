@@ -1,0 +1,27 @@
+#!/bin/sh
+# sends a dummy telex message every 15 seconds
+
+#usage sendmessage mqtt-host mqtt-port
+
+mqttserver=localhost
+mqttport=1883
+interval=15
+
+if [ $# -gt 0 ]; then
+    mqttserver="$1"
+fi
+
+if [ $# -gt 1 ]; then
+    mqttport="$2"
+fi
+
+if [ $# -gt 2 ]; then
+    interval="$3"
+fi
+
+echo "sending messages to to $mqttserver:$mqttport"
+
+while true; do
+    echo yet another interesting message
+    sleep $interval
+done | mosquitto_pub -l -t "telex/incoming-sat/" -h $mqttserver -p $mqttport

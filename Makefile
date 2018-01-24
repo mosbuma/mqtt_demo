@@ -1,14 +1,14 @@
 CFLAGS += -std=c99 -g -O3 -Wall #-Werror
-LDFLAGS += -lmosquitto
+LDLIBS += -lmosquitto
 
 # Uncomment this to print out debugging info.
-#CFLAGS += -DDEBUG
+CFLAGS += -DDEBUG
 
-PROJECT=client
+PROJECT=telexmqtt
 
 all: ${PROJECT}
 
-client: client.o
+client: telexmqtt.o
 
 client.o: Makefile
 
