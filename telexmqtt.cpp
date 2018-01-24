@@ -15,6 +15,7 @@
  */
 
 #include "telex.h"
+#include <getopt.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -24,6 +25,7 @@
 #include <string.h>
 #include <assert.h>
 #include <err.h>
+
 
 #include <stdlib.h>
 
@@ -66,10 +68,87 @@ static bool set_callbacks(struct mosquitto *m);
 static bool connect(struct mosquitto *m);
 static int run_loop(struct client_info *info);
 
+
+static void print_usage(const char *prog)
+{
+	printf("Usage: %s [-npDh]\n", prog);
+	puts("  -n --hostname : mqtt host IP or name\n"
+	     "  -p --port : mqtt port on host\n"
+       "  -d --dummy : dummy telex mode: send messages to console\n"
+  		 "  -h --help : display this message\n");
+	exit(1);
+}
+
+uint8_t echo=0; // disable local echo
+uint8_t timeout=0;
+
+char *hostname;
+int port;
+int dummyMode=0;
+
+static void parse_opts(int argc, char *argv[])
+{
+	static const struct option lopts[] = {
+		{ "hostname", required_argument, 0, 'n' },
+		{ "port", required_argument, 0, 'p' },
+    { "dummy", no_argument, 0, 'd' },
+		{ "help", no_argument, 0, 'h' },
+		{ NULL, 0, 0, 0 }
+	};
+
+	int c;
+
+	while (1)
+	{
+		c = getopt_long(argc, argv, "n:p:dh", lopts, NULL);
+		if (c==-1)
+		{
+      if(hostname==0||port==0) {
+  			printf("Invalid  parameters: please specify at least hostname and port\n");
+  			print_usage(argv[0]);
+        exit(0);
+      }
+			break;
+		}
+
+		switch (c)
+		{
+			case 'n':
+				// change host name
+        hostname=optarg;
+				break;
+			case 'p':
+        port=atoi(optarg);
+				break;
+      case 'd':
+        dummyMode=1;
+				break;
+			case 'h':
+			default:
+				print_usage(argv[0]);
+		}
+	}
+}
+
+telex *pDaTelex=0;
+
 int main(int argc, char **argv) {
+    parse_opts(argc, argv);
+
+    if(hostname==0) {
+      return 0;
+    }
+
     pid_t pid = getpid();
 
-     mosquitto_lib_init();
+    if(dummyMode==0) {
+      pDaTelex=new telex();
+      // pDaTelex=0;
+    } else {
+      pDaTelex=0;
+    }
+
+    mosquitto_lib_init();
 
     struct client_info info;
     memset(&info, 0, sizeof(info));
@@ -93,6 +172,9 @@ int main(int argc, char **argv) {
 /* Fail with an error message. */
 static void die(const char *msg) {
     fprintf(stderr, "%s", msg);
+
+    mosquitto_lib_cleanup();
+
     exit(1);
 }
 
@@ -140,43 +222,23 @@ static bool match(const char *topic, const char *key) {
 /* Handle a message that just arrived via one of the subscriptions. */
 static void on_message(struct mosquitto *m, void *udata,
                        const struct mosquitto_message *msg) {
-    LOG("on_message");
-
     if (msg == NULL) { return; }
-    LOG("-- got message @ %s: (%d, QoS %d, %s) '%s'\n",
-        (char *) msg->topic, msg->payloadlen, msg->qos, msg->retain ? "R" : "!r",
-        (char *) msg->payload);
+    // LOG("-- got message @ %s: (%d, QoS %d, %s) '%s'\n",
+    //     (char *) msg->topic, msg->payloadlen, msg->qos, msg->retain ? "R" : "!r",
+    //     (char *) msg->payload);
 
 //    struct client_info *info = (struct client_info *)udata;
 
     if (match(msg->topic, TELEX_INCOMING_FROM_SAT)) {
-        LOG("incoming from satellite: '%s'\n", (char *) msg->payload);
-        // if (0 == strncmp(msg->payload, "tick", msg->payloadlen)) {
-        //     LOG("tock %d\n", info->pid);
-        //     size_t sz = 32;
-        //     char tock_pid[sz];
-        //     info->tick_ct++;
-        //     if (sz < snprintf(tock_pid, sz, "tock/%d", info->pid)) {
-        //         die("snprintf\n");
-        //     }
-        //
-        //     size_t payload_sz = 32;
-        //     char payload[payload_sz];
-        //     size_t payloadlen = 0;
-        //     payloadlen = snprintf(payload, payload_sz, "tock %d %d",
-        //         info->pid, info->tick_ct);
-        //     if (payload_sz < payloadlen) {
-        //         die("snprintf\n");
-        //     }
-        //
-        //     int res = mosquitto_publish(m, NULL, tock_pid,
-        //         payloadlen, payload, 0, false);
-        //     if (res != MOSQ_ERR_SUCCESS) {
-        //         die("publish\n");
-        //     }
-        // } else {
-        //     LOG("invalid 'tick' message\n");
-        // }
+        if(pDaTelex!=0) {
+          pDaTelex->setPower(1);
+      		usleep(4000000);
+      		pDaTelex->sendString((uint8_t*)msg->payload);
+      		usleep(2000000);
+      		pDaTelex->setPower(0);
+        } else {
+          printf("Dummy Telex says: message from satellite '%s'\n", (char *) msg->payload);
+        }
     } else if (match(msg->topic, TELEX_CONTROL_ALL)) {
         LOG("incoming from control: %s\n", (char *) msg->payload);
         /* This will cover both "control/all" and "control/$(PID)".
@@ -206,7 +268,8 @@ static bool set_callbacks(struct mosquitto *m) {
 
 /* Connect to the network. */
 static bool connect(struct mosquitto *m) {
-    int res = mosquitto_connect(m, BROKER_HOSTNAME, BROKER_PORT, KEEPALIVE_SECONDS);
+//    int res = mosquitto_connect(m, BROKER_HOSTNAME, BROKER_PORT, KEEPALIVE_SECONDS);
+    int res = mosquitto_connect(m, hostname, port, KEEPALIVE_SECONDS);
     return res == MOSQ_ERR_SUCCESS;
 }
 
