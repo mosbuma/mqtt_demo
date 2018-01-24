@@ -49,7 +49,6 @@ class telex
 		void baudotSendChar(uint8_t data);
 		uint8_t detectStartBit(void);
 		uint8_t baudotReceiveChar(uint8_t localEcho=0);
-		void baudotSendAlphabetSelect(uint8_t alphabet);
 		void sendChar(uint8_t data, uint8_t filter=1);
 		void sendString(uint8_t *data, uint8_t filter=1);
 

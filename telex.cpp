@@ -2,17 +2,16 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-//#include <stdint.h>
 #include "telex.h"
 
 //#include <sys/time.h>
 //#include <math.h>
 
-// Access from ARM Running Linux
+// Raspberry PI direct IO based on: https://elinux.org/Rpi_Datasheet_751_GPIO_Registers
 #define PERIPHERAL_BASE 0x3F000000
 #define PERIPHERAL_BASE_LEGACY 0x20000000
-#define GPIO_BASE (PERIPHERAL_BASE + 0x200000) /* GPIO controller */
-#define GPIO_BASE_LEGACY (PERIPHERAL_BASE_LEGACY + 0x200000) /* GPIO controller */
+#define GPIO_BASE (PERIPHERAL_BASE + 0x200000)
+#define GPIO_BASE_LEGACY (PERIPHERAL_BASE_LEGACY + 0x200000)
 
 #define PAGE_SIZE (4*1024)
 #define BLOCK_SIZE (4*1024)
@@ -26,13 +25,26 @@
 #define GPIO_CLR *(this->gpio+10) // clears bits which are 1 ignores bits which are 0
 #define GPIO_GET *(this->gpio+13)
 
-#define BELL 0x0b
+
+// Telex ITA2 characterset defenitions
+// https://en.wikipedia.org/wiki/Baudot_code
+// https://en.wikipedia.org/wiki/Teleprinter
+#define BELL_CHARACTER 0x0b
+#define NULL_CHARACTER 0x00
 #define SELECT_ALPHABET_1 0x1f
 #define SELECT_ALPHABET_2 0x1b
+
+// * = null
+// % = bell
+// $ = who are you?
+// ~ = switch to letter alphabet (1)
+// ^ = switch to digit alphabet (2)
 
 const uint8_t telex::alphabet1[32]={'*','e',0x0a,'a',' ','s', 'i','u',0x0d,'d','r','j','n','f','c','k','t','z','l','w','h','y','p','q','o','b','g','~','m','x','v','^'};
 const uint8_t telex::alphabet2[32]={'*','3',0x0a,'-',' ','\'','8','7',0x0d,'$','4','%',',','!',':','(','5','+',')','2','#','6','0','1','9','?','&','~','.','/','=','^'};
 
+// SYMBOL_TIME = 20000 for 50 bd Telex (micro seconds)
+// SYMBOL_TIME = 22000 for 45.5 bd Telex (micro seconds)
 #define SYMBOL_TIME 20000
 
 telex::telex(uint8_t pinWriterOut, uint8_t pinKeyboardIn, uint8_t pinPowerControl, uint8_t pinPowerPhase, uint8_t legacyIOMapping)
@@ -142,8 +154,13 @@ uint8_t telex::baudotEncodeChar(uint8_t *data, uint8_t filter)
   if ((data[0]=='"')||(data[0]=='`')) data[0]='\'';
   // replace '*','~','^' characters with '+'
   // '*' character is used to encode null, '~' is used for char/digit switch and '^' is used for digit/char switch
-  if ((filter)&&((data[0]=='*')||(data[0]=='~')||(data[0]=='^'))) data[0]='+';
-  alphabet=this->baudotGetAlphabet(data);
+  if (filter)
+	{
+		if ((data[0]=='*')||(data[0]=='~')||(data[0]=='^'))
+			data[0]='+';
+	}
+
+	alphabet=this->baudotGetAlphabet(data);
   if (!alphabet) // character not in alphabet, so replace with '+' character
   {
     data[0]='+';
@@ -184,7 +201,7 @@ void telex::baudotSendChar(uint8_t data)
 {
   if ((data==SELECT_ALPHABET_1)||(data==SELECT_ALPHABET_2))
   {
-	this->currentAlphabet=(data==SELECT_ALPHABET_1)?1:2;
+		this->currentAlphabet=(data==SELECT_ALPHABET_1)?1:2;
     printf("Change alphabet to %d\n",this->currentAlphabet);
   }
 
@@ -197,7 +214,10 @@ void telex::baudotSendChar(uint8_t data)
     usleep(SYMBOL_TIME);
   }
   this->digitalWrite(this->pinWriterOut,1); // stopbit
-  usleep(SYMBOL_TIME);
+	if ((data==SELECT_ALPHABET_1)||(data==SELECT_ALPHABET_2))
+		usleep(SYMBOL_TIME*5); // allow for some extra time to switch alphabet
+	else
+		usleep(SYMBOL_TIME);
 }
 
 uint8_t telex::detectStartBit(void)
@@ -231,21 +251,16 @@ uint8_t telex::baudotReceiveChar(uint8_t localEcho)
   return data;
 }
 
-void telex::baudotSendAlphabetSelect(uint8_t alphabet)
-{
-  if (alphabet==1) baudotSendChar(SELECT_ALPHABET_1);
-  else baudotSendChar(SELECT_ALPHABET_2);
-  usleep(SYMBOL_TIME*4);
-}
-
 void telex::sendChar(uint8_t data, uint8_t filter)
 {
   uint8_t baudot=data,
-		  alphabet=this->baudotEncodeChar(&baudot,filter);
+		  		alphabet=this->baudotEncodeChar(&baudot,filter);
 
   if (alphabet!=this->currentAlphabet)
   {
-    this->baudotSendAlphabetSelect(alphabet);
+		this->baudotSendChar(NULL_CHARACTER);
+		this->baudotSendChar((alphabet==1)?SELECT_ALPHABET_1:SELECT_ALPHABET_2);
+		this->baudotSendChar((alphabet==1)?SELECT_ALPHABET_1:SELECT_ALPHABET_2);
     this->currentAlphabet=alphabet;
   }
   printf("Print %c\n",data);
