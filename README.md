@@ -3,8 +3,10 @@
 This toolset is used to send text messages over MQTT to our demo telex.
 
 It consists of 2 programs:
-  telexCtrl - commandline utility to send text to / read texts from a telex
-  telexmqtt - commandline utility that listens for messages on a channel on a MQTT broker and sends these to a telex
+
+  * telexCtrl - commandline utility to send text to / read texts from a telex
+
+  * telexmqtt - commandline utility that listens for messages on a channel on a MQTT broker and sends these to a telex
 
 See the --help options in the utilities for more details
 
@@ -62,7 +64,7 @@ use the sendmessages script from another terminal window to simulate transmissio
 
 The utility monitors /telex/incoming-sat/ channel on the MQTT broker for incoming messages.
 
-use an MQTT client such as MQTT.fx to connect to the broker and manually send messages.
+Use an MQTT client such as MQTT.fx to connect to the broker and manually send messages.
 
 Start the utility with telex
 
