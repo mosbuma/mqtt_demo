@@ -9,7 +9,7 @@
 
 static void print_usage(const char *prog)
 {
-  printf("Teleprinter (Teletype,Telex) commandline utility for Raspberry Pi. The following connections are assumed:\n", prog);
+  printf("Teleprinter (Teletype,Telex) commandline utility for Raspberry Pi. The following connections are assumed:\n");
   printf("- writer output = GPIO17\n");
   printf("- keyboard input = GPIO18\n");
   printf("- power switch output = GPIO27\n");
