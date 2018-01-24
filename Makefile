@@ -1,16 +1,17 @@
-CFLAGS += -std=c99 -g -O3 -Wall #-Werror
+CC = g++
+CFLAGS += -O3 -g3 -Wall -fPIC #-Werror
 LDLIBS += -lmosquitto
 
 # Uncomment this to print out debugging info.
 CFLAGS += -DDEBUG
 
-PROJECT=telexmqtt
+all: telexmqtt telexCtrl
 
-all: ${PROJECT}
+telexmqtt:
+	$(CC) $(CFLAGS) "telex.cpp" "telexmqtt.cpp" -o "telexmqtt" $(LDLIBS)
 
-client: telexmqtt.o
-
-client.o: Makefile
+telexCtrl:
+	$(CC) $(CFLAGS) "telex.cpp" "telexCtrl.cpp" -o "telexCtrl" $(LDLIBS)
 
 clean:
-	rm -rf *.o ${PROJECT}
+	rm -rf *.o telexmqtt telexCtrl

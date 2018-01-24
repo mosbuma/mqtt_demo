@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2014 Scott Vokes <vokes.s@gmail.com>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#include "telex.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -8,7 +25,16 @@
 #include <assert.h>
 #include <err.h>
 
+#include <stdlib.h>
+
 #include <mosquitto.h>
+
+/* The linked code creates a client that connects to a broker at
+ * localhost:1883, subscribes to the topics "tick", "control/#{PID}",
+ * and "control/all", and publishes its process ID and uptime (in
+ * seconds) on "tock/#{PID}" every time it gets a "tick" message. If the
+ * message "halt" is sent to either "control" endpoint, it will
+ * disconnect, free its resources, and exit. */
 
 #ifdef DEBUG
 #define LOG(...) do { printf(__VA_ARGS__); } while (0)
@@ -73,7 +99,7 @@ static void die(const char *msg) {
 /* Initialize a mosquitto client. */
 static struct mosquitto *init(struct client_info *info) {
     void *udata = (void *)info;
-    size_t buf_sz = 32;
+    int buf_sz = 32;
     char buf[buf_sz];
     if (buf_sz < snprintf(buf, buf_sz, "client_%d", info->pid)) {
         return NULL;            /* snprintf buffer failure */
@@ -90,7 +116,7 @@ static void on_connect(struct mosquitto *m, void *udata, int res) {
         struct client_info *info = (struct client_info *)udata;
         mosquitto_subscribe(m, NULL, TELEX_INCOMING_FROM_SAT, 0);
         mosquitto_subscribe(m, NULL, TELEX_CONTROL_ALL, 0);
-        size_t sz = 32;
+        int sz = 32;
         char control_pid[sz];
         if (sz < snprintf(control_pid, sz, TELEX_CONTROL_PID, info->pid)) {
             die("snprintf\n");
@@ -118,13 +144,13 @@ static void on_message(struct mosquitto *m, void *udata,
 
     if (msg == NULL) { return; }
     LOG("-- got message @ %s: (%d, QoS %d, %s) '%s'\n",
-        msg->topic, msg->payloadlen, msg->qos, msg->retain ? "R" : "!r",
-        msg->payload);
+        (char *) msg->topic, msg->payloadlen, msg->qos, msg->retain ? "R" : "!r",
+        (char *) msg->payload);
 
 //    struct client_info *info = (struct client_info *)udata;
 
     if (match(msg->topic, TELEX_INCOMING_FROM_SAT)) {
-        LOG("incoming from satellite: '%s'\n", msg->payload);
+        LOG("incoming from satellite: '%s'\n", (char *) msg->payload);
         // if (0 == strncmp(msg->payload, "tick", msg->payloadlen)) {
         //     LOG("tock %d\n", info->pid);
         //     size_t sz = 32;
@@ -152,11 +178,11 @@ static void on_message(struct mosquitto *m, void *udata,
         //     LOG("invalid 'tick' message\n");
         // }
     } else if (match(msg->topic, TELEX_CONTROL_ALL)) {
-        LOG("incoming from control: %s\n", msg->payload);
+        LOG("incoming from control: %s\n", (char *) msg->payload);
         /* This will cover both "control/all" and "control/$(PID)".
          * We won'st see "control/$(OTHER_PID)" because we won't be
          * subscribed to them.*/
-        if (0 == strncmp(msg->payload, "halt", msg->payloadlen)) {
+        if (0 == strncmp((char *) msg->payload, "halt", msg->payloadlen)) {
             LOG("*** halt\n");
             (void)mosquitto_disconnect(m);
         }
