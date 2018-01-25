@@ -50,6 +50,7 @@ const uint8_t telex::alphabet2[32]={'*','3',0x0a,'-',' ','\'','8','7',0x0d,'$','
 telex::telex(uint8_t pinWriterOut, uint8_t pinKeyboardIn, uint8_t pinPowerControl, uint8_t pinPowerPhase, uint8_t legacyIOMapping)
 {
 	this->currentAlphabet=0;
+	this->cursorPos=0;
 
 	unsigned long gpio_base_offset=(legacyIOMapping)?GPIO_BASE_LEGACY:GPIO_BASE;
 	int mem_fd;
@@ -272,8 +273,40 @@ void telex::sendString(uint8_t *data, uint8_t filter)
   uint16_t zz=0;
   while(data[zz])
   {
-    this->sendChar(data[zz],filter);
+		if (data[zz]=='\r')
+		{
+			printf("Ignoring carriage return\n");
+			zz++;
+			continue;
+		}
+
+		if (data[zz]=='\n')
+		{
+			printf("Inserting carriage return before line feed\n");
+			this->cursorPos=0;
+			this->sendChar('\r',filter);
+			usleep(20000);
+		}
+		this->sendChar(data[zz],filter);
     zz++;
+		// * = null
+		// % = bell
+		// $ = who are you?
+		// ~ = switch to letter alphabet (1)
+		// ^ = switch to digit alphabet (2)
+
+		if ((data[zz]!='*')&&(data[zz]!='%')&&(data[zz]!='~')&&(data[zz]!='^'))
+			this->cursorPos++;
+		if (this->cursorPos>=69) // insert extra line break if needed
+		{
+			printf("Inserting extra line break");
+			this->cursorPos=0;
+			this->sendChar('\n',filter);
+			usleep(20000);
+			this->sendChar('\r',filter);
+			usleep(20000);
+		}
+
     usleep(20000);
   }
 }

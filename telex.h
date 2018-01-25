@@ -36,6 +36,7 @@ class telex
 		static const uint8_t alphabet2[32];
 
 		uint8_t currentAlphabet;
+		uint8_t cursorPos;
 
 	public:
 		telex(uint8_t pinWriterOut=17, uint8_t pinKeyboardIn=18, uint8_t pinPowerControl=27, uint8_t pinPowerPhase=22, uint8_t legacyIOMapping=0);

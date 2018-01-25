@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <err.h>
 #include <string>
+#include <ctime>
 
 #include <stdlib.h>
 
@@ -153,6 +154,7 @@ static void parse_opts(int argc, char *argv[])
 }
 
 telex *pDaTelex=0;
+ std::time_t start = std::chrono::system_clock::now();
 
 void handle_signal (int x)
 {

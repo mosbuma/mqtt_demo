@@ -9,14 +9,15 @@
 
 static void print_usage(const char *prog)
 {
-  printf("Teleprinter (Teletype,Telex) commandline utility for Raspberry Pi. The following connections are assumed:\n");
+  printf("Teleprinter (Teletype,Telex) commandline utility for Raspberry Pi.\nThe following connections are assumed:\n");
   printf("- writer output = GPIO17\n");
   printf("- keyboard input = GPIO18\n");
   printf("- power switch output = GPIO27\n");
-	printf("Usage: %s [-pfrnetlh]\n", prog);
+	printf("Usage: %s [-pfrsnetlh]\n", prog);
 	puts("  -p --print print text on telex \"line 1|_line2|_\" ('%'=BELL,'|'=CR,'_'=NL,'*'=NULL) \n"
        "  -f --format print one line of text with timestamp header \"line of text to print on telex\" \n"
        "  -r --read reads data from telex\n"
+       "  -s --stop cut power to telex\n"
 	     "  -n --number number of characters to read\n"
 	     "  -e --echo enable local echo\n"
 	     "  -t --timeout number of seconds to wait for next character (default 5 seconds)\n"
@@ -38,7 +39,8 @@ static void parse_opts(int argc, char *argv[])
 	static const struct option lopts[] = {
 		{ "print",  required_argument, 0, 'p' },
     { "format",  required_argument, 0, 'f' },
-		{ "read",   no_argument, 0, 'r' },
+    { "read", no_argument, 0, 'r' },
+    { "stop", no_argument, 0, 's' },
 		{ "number", required_argument, 0, 'n' },
 		{ "echo", no_argument, 0, 'e' },
 		{ "timeout", required_argument, 0, 't' },
@@ -51,13 +53,13 @@ static void parse_opts(int argc, char *argv[])
 
 	while (1)
 	{
-		c = getopt_long(argc, argv, "p:f:r:n:e:t:l:h", lopts, NULL);
+		c = getopt_long(argc, argv, "p:f:rsn:et:lh", lopts, NULL);
 
 		if (c == -1)
 		{
 			if (mode==0)
 			{
-				printf("Invalid parameters: please specify at least print or read mode\n");
+				printf("Invalid parameters: please specify operation mode (print, format, read, stop)\n");
 				print_usage(argv[0]);
 			}
       if ((mode==3)&&((!timeout)&&(!number)))
@@ -72,15 +74,42 @@ static void parse_opts(int argc, char *argv[])
 		switch (c)
 		{
 			case 'p':
-				mode=1; // print
+        if (mode)
+        {
+          printf("Invalid parameters: only one mode specifier allowed (print, format, read, stop)\n");
+          mode=0;
+          break;
+        }
+        mode=1; // print
 				data=optarg;
 				break;
 			case 'f':
+        if (mode)
+        {
+          printf("Invalid parameters: only one mode specifier allowed (print, format, read, stop)\n");
+          mode=0;
+          break;
+        }
 				mode=2;
 				data=optarg;
 				break;
 			case 'r':
+        if (mode)
+        {
+          printf("Invalid parameters: only one mode specifier allowed (print, format, read, stop)\n");
+          mode=0;
+          break;
+        }
 				mode=3;
+				break;
+      case 's':
+        if (mode)
+        {
+          printf("Invalid parameters: only one mode specifier allowed (print, format, read, stop)\n");
+          mode=0;
+          break;
+        }
+				mode=4;
 				break;
 			case 'n':
 				number=abs(atoi(optarg));
@@ -161,7 +190,7 @@ int main(int argc, char **argv)
       {
         uint32_t lastKeyStrokeTimer=0;
         int keyStrokeCounter=0;
-
+        printf("Listening for keyboard input\n");
         t->setPower(1);
         while(1)
     		{
@@ -171,17 +200,30 @@ int main(int argc, char **argv)
             keyStrokeCounter++;
 
             uint8_t data=t->baudotDecodeChar(t->baudotReceiveChar(echo));
-    				printf("%c",data);
+    				printf("%c\n",data);
     				if (data=='$')
     				  break;
     			}
     			usleep(100);
           lastKeyStrokeTimer++;
           if (lastKeyStrokeTimer>=(timeout*10000))
+          {
+            printf("Timeout on keyboard input\n");
             break;
-          if (keyStrokeCounter>=number)
+          }
+          if ((number)&&(keyStrokeCounter>=number))
+          {
+            printf("Requested number (%d) of characters read from keyboard\n",number);
             break;
+          }
     		}
+        t->setPower(0);
+        usleep(2000000);
+      }
+      break;
+    case 4:
+      {
+        printf("Cutting power to telex\n");
         t->setPower(0);
         usleep(2000000);
       }
