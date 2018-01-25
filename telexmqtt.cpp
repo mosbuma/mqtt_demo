@@ -21,12 +21,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
 #include <assert.h>
 #include <err.h>
-
+#include <string>
 
 #include <stdlib.h>
 
@@ -78,6 +79,7 @@ static void print_usage(const char *prog)
        "  -u --user : mqtt username (omit to login anonymously)\n"
        "  -P --pass : mqtt password\n"
        "  -d --dummy : dummy telex mode: send messages to console\n"
+       "  -w --wrap : set auto text wrap at X cnaracters \n"
   		 "  -h --help : display this message\n");
 	exit(1);
 }
@@ -92,6 +94,8 @@ int dummyMode=0;
 char *username;
 char *password;
 
+int wrap = 60;
+
 static void parse_opts(int argc, char *argv[])
 {
 	static const struct option lopts[] = {
@@ -100,6 +104,7 @@ static void parse_opts(int argc, char *argv[])
     { "dummy", no_argument, 0, 'd' },
     { "user", no_argument, 0, 'u' },
     { "pass", no_argument, 0, 'P' },
+    { "wrap", no_argument, 0, 'w' },
 		{ "help", no_argument, 0, 'h' },
 		{ NULL, 0, 0, 0 }
 	};
@@ -108,7 +113,7 @@ static void parse_opts(int argc, char *argv[])
 
 	while (1)
 	{
-		c = getopt_long(argc, argv, "n:p:u:P:dh", lopts, NULL);
+		c = getopt_long(argc, argv, "n:p:u:P:dw:h", lopts, NULL);
 		if (c==-1)
 		{
       if(hostname==0||port==0) {
@@ -137,6 +142,9 @@ static void parse_opts(int argc, char *argv[])
       case 'P':
         password=optarg;
 				break;
+      case 'w':
+        wrap=atoi(optarg);
+				break;
 			case 'h':
 			default:
 				print_usage(argv[0]);
@@ -146,7 +154,24 @@ static void parse_opts(int argc, char *argv[])
 
 telex *pDaTelex=0;
 
+void handle_signal (int x)
+{
+  exit(x); // -> calls ceannup via atexit
+}
+
+void cleanup_resources ()
+{
+  if(pDaTelex!=0) {
+    pDaTelex->sendString((uint8_t*) "\r\n");
+    pDaTelex->setPower(0);
+  }
+}
+
 int main(int argc, char **argv) {
+    atexit (cleanup_resources);
+    signal(SIGINT, handle_signal); // catch ctrl+c for cleanup
+    signal(SIGABRT, handle_signal); // catch abort for cleanup
+
     parse_opts(argc, argv);
 
     if(hostname==0) {
@@ -186,7 +211,7 @@ int main(int argc, char **argv) {
 
     mosquitto_lib_cleanup();
 
-    return res;
+    exit (res);
 }
 
 /* Fail with an error message. */
@@ -250,14 +275,20 @@ static void on_message(struct mosquitto *m, void *udata,
 //    struct client_info *info = (struct client_info *)udata;
 
     if (match(msg->topic, TELEX_INCOMING_FROM_SAT)) {
+        std::string base=(char *) msg->payload;
+        if(base.length()>60) {
+          base = base.substr(0, 57).append("...");
+        }
+
         if(pDaTelex!=0) {
           pDaTelex->setPower(1);
       		usleep(4000000);
-      		pDaTelex->sendString((uint8_t*)msg->payload);
+      		pDaTelex->sendString((uint8_t*) base.c_str());
+          pDaTelex->sendString((uint8_t*)"\r\n");
       		usleep(2000000);
       		pDaTelex->setPower(0);
         } else {
-          printf("Dummy Telex says: message from satellite '%s'\n", (char *) msg->payload);
+          printf("Dummy Telex says: message from satellite '%s'\n", (char *) base.c_str());
         }
     } else if (match(msg->topic, TELEX_CONTROL_ALL)) {
         LOG("incoming from control: %s\n", (char *) msg->payload);
@@ -295,7 +326,7 @@ static bool connect(struct mosquitto *m) {
 
 /* Loop until it is explicitly halted or the network is lost, then clean up. */
 static int run_loop(struct client_info *info) {
-    int res = mosquitto_loop_forever(info->m, 1000, 1000 /* unused */);
+    int res = mosquitto_loop_forever(info->m, 1000, 1 /* unused */);
 
     mosquitto_destroy(info->m);
     (void)mosquitto_lib_cleanup();
