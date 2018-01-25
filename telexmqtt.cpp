@@ -154,7 +154,6 @@ static void parse_opts(int argc, char *argv[])
 }
 
 telex *pDaTelex=0;
- std::time_t start = std::chrono::system_clock::now();
 
 void handle_signal (int x)
 {
