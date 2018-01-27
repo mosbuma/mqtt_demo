@@ -163,7 +163,7 @@ void handle_signal (int x)
 void cleanup_resources ()
 {
   if(pDaTelex!=0) {
-    pDaTelex->sendString((uint8_t*) "\r\n");
+    pDaTelex->sendString((uint8_t*) "\n");
     pDaTelex->setPower(0);
   }
 }
@@ -282,12 +282,8 @@ static void on_message(struct mosquitto *m, void *udata,
         }
 
         if(pDaTelex!=0) {
-          pDaTelex->setPower(1);
-      		usleep(4000000);
       		pDaTelex->sendString((uint8_t*) base.c_str());
-          pDaTelex->sendString((uint8_t*)"\r\n");
-      		usleep(2000000);
-      		pDaTelex->setPower(0);
+          pDaTelex->sendString((uint8_t*)"\n");
         } else {
           printf("Dummy Telex says: message from satellite '%s'\n", (char *) base.c_str());
         }
@@ -327,8 +323,18 @@ static bool connect(struct mosquitto *m) {
 
 /* Loop until it is explicitly halted or the network is lost, then clean up. */
 static int run_loop(struct client_info *info) {
-    int res = mosquitto_loop_forever(info->m, 1000, 1 /* unused */);
+//    int res = mosquitto_loop_forever(info->m, 1000, 1 /* unused */);
+    while(1)
+    {
+      // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
 
+      int res = mosquitto_loop(info->m, 1000, 1 /* unused */);
+
+      if(pDaTelex!=0) {
+        pDaTelex->checkPowerTimeout();
+      }
+
+    }
     mosquitto_destroy(info->m);
     (void)mosquitto_lib_cleanup();
 

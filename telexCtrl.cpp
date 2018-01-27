@@ -32,7 +32,7 @@ uint8_t echo=0; // disable local echo
 uint8_t legacy=0; // use legacy IO mapping (Raspberry Pi 1 & Zero)
 char *data;
 uint16_t number=0;
-uint8_t timeout=5;
+uint8_t timeout=10;
 
 static void parse_opts(int argc, char *argv[])
 {
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 
 	if (!mode) return 0;
 
-	telex *t=new telex(17,18,27,22,legacy);
+	telex *t=new telex(17,18,27,22,legacy,timeout);
 
   switch(mode)
   {
@@ -149,11 +149,8 @@ int main(int argc, char **argv)
     			if (data[g]=='_') data[g]='\n';
     			g++;
     		}
-			  t->setPower(1);
-			  usleep(4000000);
     		t->sendString((uint8_t*)data,0);
     		t->setPower(0);
-    		usleep(2000000);
       }
       break;
     case 2:
@@ -179,53 +176,39 @@ int main(int argc, char **argv)
         strftime(data2,32,"+++ %Y/%m/%d %H:%M:%S +++\r\n= ",localtime(&now));
         strcpy(data2+strlen(data2),data);
         strcpy(data2+strlen(data2)," =\r\n%");//+++ end +++\r\n");
-        t->setPower(1);
-    	  usleep(4000000);
     	  t->sendString((uint8_t*)data2);
         t->setPower(0);
-   		  usleep(2000000);
       }
       break;
     case 3:
       {
-        uint32_t lastKeyStrokeTimer=0;
         int keyStrokeCounter=0;
         printf("Listening for keyboard input\n");
-        t->setPower(1);
-        while(1)
+        while(t->getPower())
     		{
     			if (t->detectStartBit())
     			{
-            lastKeyStrokeTimer=0;
             keyStrokeCounter++;
-
-            uint8_t data=t->baudotDecodeChar(t->baudotReceiveChar(echo));
+            uint8_t data=t->receiveChar(echo);
     				printf("%c\n",data);
     				if (data=='$')
     				  break;
     			}
     			usleep(100);
-          lastKeyStrokeTimer++;
-          if (lastKeyStrokeTimer>=(timeout*10000))
-          {
-            printf("Timeout on keyboard input\n");
-            break;
-          }
           if ((number)&&(keyStrokeCounter>=number))
           {
             printf("Requested number (%d) of characters read from keyboard\n",number);
             break;
           }
+          t->checkPowerTimeout();
     		}
         t->setPower(0);
-        usleep(2000000);
       }
       break;
     case 4:
       {
         printf("Cutting power to telex\n");
         t->setPower(0);
-        usleep(2000000);
       }
       break;
 	}

@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <time.h>
 #include "telex.h"
 
 //#include <sys/time.h>
@@ -25,20 +26,32 @@
 #define GPIO_CLR *(this->gpio+10) // clears bits which are 1 ignores bits which are 0
 #define GPIO_GET *(this->gpio+13)
 
+// delay in microseconds
+#define POWER_UP_DELAY 4000000
+#define POWER_DOWN_DELAY 2000000
 
 // Telex ITA2 characterset defenitions
 // https://en.wikipedia.org/wiki/Baudot_code
 // https://en.wikipedia.org/wiki/Teleprinter
-#define BELL_CHARACTER 0x0b
-#define NULL_CHARACTER 0x00
-#define SELECT_ALPHABET_1 0x1f
-#define SELECT_ALPHABET_2 0x1b
+#define BAUDOT_LF 0x02
+#define BAUDOT_CR 0x08
+#define BAUDOT_WRU 0x09
+#define BAUDOT_BELL 0x0b
+#define BAUDOT_NULL 0x00
+#define BAUDOT_ALPHABET_1 0x1f
+#define BAUDOT_ALPHABET_2 0x1b
+#define BAUDOT_NATIONAL_1 0x0d
+#define BAUDOT_NATIONAL_2 0x14
+#define BAUDOT_NATIONAL_3 0x1a
 
-// * = null
+// $ = who are you? (WRU)
 // % = bell
-// $ = who are you?
-// ~ = switch to letter alphabet (1)
-// ^ = switch to digit alphabet (2)
+// * = null
+// ~ = switch to letter alphabet (alphabet=1)
+// ^ = switch to digit alphabet (alphabet=2)
+// ! = national 1
+// # = national 2
+// & = national 3
 
 const uint8_t telex::alphabet1[32]={'*','e',0x0a,'a',' ','s', 'i','u',0x0d,'d','r','j','n','f','c','k','t','z','l','w','h','y','p','q','o','b','g','~','m','x','v','^'};
 const uint8_t telex::alphabet2[32]={'*','3',0x0a,'-',' ','\'','8','7',0x0d,'$','4','%',',','!',':','(','5','+',')','2','#','6','0','1','9','?','&','~','.','/','=','^'};
@@ -47,10 +60,12 @@ const uint8_t telex::alphabet2[32]={'*','3',0x0a,'-',' ','\'','8','7',0x0d,'$','
 // SYMBOL_TIME = 22000 for 45.5 bd Telex (micro seconds)
 #define SYMBOL_TIME 20000
 
-telex::telex(uint8_t pinWriterOut, uint8_t pinKeyboardIn, uint8_t pinPowerControl, uint8_t pinPowerPhase, uint8_t legacyIOMapping)
+telex::telex(uint8_t pinWriterOut, uint8_t pinKeyboardIn, uint8_t pinPowerControl, uint8_t pinColorControl, uint8_t legacyIOMapping, uint8_t powerTimout)
 {
 	this->currentAlphabet=0;
 	this->cursorPos=0;
+	this->powerState=0;
+	this->powerTimeout=powerTimout;
 
 	unsigned long gpio_base_offset=(legacyIOMapping)?GPIO_BASE_LEGACY:GPIO_BASE;
 	int mem_fd;
@@ -71,13 +86,15 @@ telex::telex(uint8_t pinWriterOut, uint8_t pinKeyboardIn, uint8_t pinPowerContro
 	this->pinKeyboardIn=pinKeyboardIn; // input
 	INP_GPIO(this->pinKeyboardIn);
 
-	this->pinPowerPhase=pinPowerPhase; // input
-	INP_GPIO(this->pinPowerPhase);
-
 	this->pinWriterOut=pinWriterOut; // output
 	INP_GPIO(this->pinWriterOut);
 	OUT_GPIO(this->pinWriterOut);
 	this->digitalWrite(this->pinWriterOut,1,0);
+
+	this->pinColorControl=pinColorControl; // output
+	INP_GPIO(this->pinColorControl);
+	OUT_GPIO(this->pinColorControl);
+	this->digitalWrite(this->pinWriterOut,0,0);
 
 	usleep(500000);
 
@@ -116,12 +133,40 @@ uint8_t telex::digitalRead(uint8_t pin)
 	return (((GPIO_GET)&this->pin2Mask(pin))!=0);
 }
 
+void telex::setColor(uint8_t redBlack)
+{
+	this->digitalWrite(this->pinColorControl,redBlack);
+  usleep(SYMBOL_TIME);
+}
+
 void telex::setPower(uint8_t onOff)
 {
 	this->digitalWrite(this->pinPowerControl,onOff);
+	this->powerState=onOff?time(NULL):0;
+  usleep(onOff?POWER_UP_DELAY:POWER_DOWN_DELAY);
 }
 
-uint8_t telex::baudotGetAlphabet(uint8_t *data)
+uint8_t telex::getPower(void)
+{
+	return (this->powerState!=0);
+}
+
+void telex::setPowerTimout(void)
+{
+	this->powerState=time(NULL);
+}
+
+uint8_t telex::checkPowerTimeout(void)
+{
+		if ((this->powerState)&&(difftime(time(NULL),this->powerState)>=this->powerTimeout))
+		{
+			this->setPower(0);
+			return 1;
+		}
+		return 0;
+}
+
+uint8_t telex::getBaudotAlphabet(uint8_t *data)
 {
   for (uint8_t zz=0;zz<32;zz++)
   {  // first search in current alphabet to prevent unnecesarry switching
@@ -143,25 +188,21 @@ uint8_t telex::baudotGetAlphabet(uint8_t *data)
   return 0;
 }
 
-uint8_t telex::baudotEncodeChar(uint8_t *data, uint8_t filter)
+uint8_t telex::encodeBaudotChar(uint8_t *data)
 {
   // transform character so it is suitable to send to telex
   // function returns alphabet to be used
   uint8_t alphabet;
 
   // set to lowercase
-  if ((data[0]>=65)&&(data[0]<=90)) data[0]+=32;
-  // replace all quote type to single quote (') character
-  if ((data[0]=='"')||(data[0]=='`')) data[0]='\'';
-  // replace '*','~','^' characters with '+'
-  // '*' character is used to encode null, '~' is used for char/digit switch and '^' is used for digit/char switch
-  if (filter)
-	{
-		if ((data[0]=='*')||(data[0]=='~')||(data[0]=='^'))
-			data[0]='+';
-	}
+  if ((data[0]>=65)&&(data[0]<=90))
+		data[0]+=32;
 
-	alphabet=this->baudotGetAlphabet(data);
+	// replace all quote type to single quote (') character
+  if ((data[0]=='"')||(data[0]=='`'))
+		data[0]='\'';
+
+	alphabet=this->getBaudotAlphabet(data);
   if (!alphabet) // character not in alphabet, so replace with '+' character
   {
     data[0]='+';
@@ -190,23 +231,96 @@ uint8_t telex::baudotEncodeChar(uint8_t *data, uint8_t filter)
   return alphabet;
 }
 
-uint8_t telex::baudotDecodeChar(uint8_t data)
+
+uint8_t telex::decodeBaudotChar(uint8_t data)
 {
-  if (data==0x1f) this->currentAlphabet=1;
-  if (data==0x1b) this->currentAlphabet=2;
+  if (data==BAUDOT_ALPHABET_1) this->currentAlphabet=1;
+  if (data==BAUDOT_ALPHABET_2) this->currentAlphabet=2;
   if (this->currentAlphabet==2) return this->alphabet2[data];
   else return this->alphabet1[data]; // assume alphabet is 1 if alphabet is not set (0)
 }
 
-void telex::baudotSendChar(uint8_t data)
+uint8_t telex::isBaudotPrintChar(uint8_t data)
 {
-  if ((data==SELECT_ALPHABET_1)||(data==SELECT_ALPHABET_2))
-  {
-		this->currentAlphabet=(data==SELECT_ALPHABET_1)?1:2;
-    printf("Change alphabet to %d\n",this->currentAlphabet);
-  }
+	switch(data)
+	{
+		case BAUDOT_CR:
+		case BAUDOT_LF:
+		case BAUDOT_BELL:
+		case BAUDOT_NULL:
+		case BAUDOT_ALPHABET_1:
+		case BAUDOT_ALPHABET_2:
+			return 0;
+		default:
+			break;
+	}
+	return 1;
+}
 
-  this->digitalWrite(this->pinWriterOut,0); // startbit
+void telex::printBaudotChar(uint8_t data)
+{
+	switch(data)
+	{
+		case BAUDOT_CR:
+			printf("<CR>");
+			break;
+		case BAUDOT_LF:
+			printf("<LF>");
+			break;
+		case BAUDOT_BELL:
+			printf("<BELL>");
+			break;
+		case BAUDOT_NULL:
+			printf("<NULL>");
+			break;
+		case BAUDOT_ALPHABET_1:
+			printf("<ALPHABET1>");
+			break;
+		case BAUDOT_ALPHABET_2:
+			printf("<ALPHABET2>");
+			break;
+		case BAUDOT_NATIONAL_1:
+			printf("<NATIONAL1>");
+			break;
+		case BAUDOT_NATIONAL_2:
+			printf("<NATIONAL2>");
+			break;
+		case BAUDOT_NATIONAL_3:
+			printf("<NATIONAL3>");
+			break;
+		default:
+			printf("%c",this->decodeBaudotChar(data));
+			break;
+	}
+}
+
+void telex::updateState(uint8_t data)
+{
+	switch(data) // set current alphabet and update cursor position
+	{
+		case BAUDOT_LF:
+		case BAUDOT_BELL:
+		case BAUDOT_NULL:
+			break;
+		case BAUDOT_ALPHABET_1:
+		case BAUDOT_ALPHABET_2:
+			this->currentAlphabet=(data==BAUDOT_ALPHABET_1)?1:2;
+			break;
+		case BAUDOT_CR:
+			this->cursorPos=0;
+			break;
+		default:
+			this->cursorPos++;
+			break;
+	}
+}
+
+void telex::sendRawChar(uint8_t data)
+{
+	if (!this->getPower())
+		this->setPower(1);
+
+	this->digitalWrite(this->pinWriterOut,0); // startbit
   usleep(SYMBOL_TIME);
   for (uint8_t zz=0;zz<5;zz++)
   {
@@ -215,20 +329,26 @@ void telex::baudotSendChar(uint8_t data)
     usleep(SYMBOL_TIME);
   }
   this->digitalWrite(this->pinWriterOut,1); // stopbit
-	if ((data==SELECT_ALPHABET_1)||(data==SELECT_ALPHABET_2))
-		usleep(SYMBOL_TIME*5); // allow for some extra time to switch alphabet
+	if ((data==BAUDOT_ALPHABET_1)||(data==BAUDOT_ALPHABET_2))
+		usleep(SYMBOL_TIME*5); // allow for some extra time to perform mechanical alphabet switch
 	else
-		usleep(SYMBOL_TIME);
+		usleep(SYMBOL_TIME*1.5); // TODO: tweak this for optimum speed ... 1.5 stopbits?
+
+	this->updateState(data);
+	this->setPowerTimout();
 }
 
 uint8_t telex::detectStartBit(void)
 {
+	if (!this->getPower())
+		this->setPower(1);
   return (this->digitalRead(this->pinKeyboardIn)!=0);
 }
 
-uint8_t telex::baudotReceiveChar(uint8_t localEcho)
+uint8_t telex::receiveRawChar(uint8_t localEcho)
 {
-  uint8_t data=0;
+	// first call function detect startbit before calling this function
+	uint8_t data=0;
 
   usleep(SYMBOL_TIME/2); // wait until we are half way into the start bit
   if (localEcho) this->digitalWrite(this->pinWriterOut,0);
@@ -237,35 +357,78 @@ uint8_t telex::baudotReceiveChar(uint8_t localEcho)
   {
     if (!this->digitalRead(this->pinKeyboardIn))
     {
-      if (localEcho) this->digitalWrite(this->pinWriterOut,1);
+      if (localEcho)
+				this->digitalWrite(this->pinWriterOut,1);
       data|=0x20;
     }
     else
     {
-      if (localEcho) this->digitalWrite(this->pinWriterOut,0);
+      if (localEcho)
+				this->digitalWrite(this->pinWriterOut,0);
     }
     data>>=1;
     usleep(SYMBOL_TIME);
   }
-  if (localEcho) this->digitalWrite(this->pinWriterOut,1);
+  if (localEcho)
+	{
+		this->digitalWrite(this->pinWriterOut,1);
+		this->updateState(data);
+	}
   usleep(SYMBOL_TIME/2+1000); // wait until we are finished with the last bit to avoid detecting false startbit
-  return data;
+	this->setPowerTimout();
+	this->printBaudotChar(data);
+	return data;
 }
 
 void telex::sendChar(uint8_t data, uint8_t filter)
 {
-  uint8_t baudot=data,
-		  		alphabet=this->baudotEncodeChar(&baudot,filter);
+	switch(filter) // first filter off illegal characters
+	{
+		case 4:
+			if ((data=='!')||(data=='#')||(data=='&')) // filter off national characters
+				data='+';
+		case 3:
+			if (data=='%') // filter off bell character
+				data='+';
+		case 2:
+			if (data=='*') // filter off null character
+				data='+';
+		case 1:
+			if ((data=='~')||(data=='^')||(data=='$')) // filter off char/digit switch (~), digit/char switch (^) and WRU - who are you ($)
+				data='+';
+		default:
+			break;
+	}
 
-  if (alphabet!=this->currentAlphabet)
+	uint8_t alphabet=this->encodeBaudotChar(&data);
+
+	if (data==BAUDOT_CR)
+	{
+		printf("Ignoring <CR>\n");
+		return; // ignore <CR>, as it is added to <LF> automatically
+	}
+	if (data==BAUDOT_LF)
+	{
+		printf("Translating <LF> to <CR><LF>\n");
+		this->sendRawChar(BAUDOT_CR); // insert <CR> before every <LF>
+		this->sendRawChar(BAUDOT_LF);
+		return;
+	}
+	if ((this->isBaudotPrintChar(data))&&(this->cursorPos>=79)) // 80 characters per line, automatically insert CR and LF on line end
+	{
+		printf("Inserting extra <CR><LF>\n");
+		this->sendRawChar(BAUDOT_CR); // insert <CR> before every <LF>
+		this->sendRawChar(BAUDOT_LF);
+	}
+	if (alphabet!=this->currentAlphabet)
   {
-		this->baudotSendChar(NULL_CHARACTER);
-		this->baudotSendChar((alphabet==1)?SELECT_ALPHABET_1:SELECT_ALPHABET_2);
-		this->baudotSendChar((alphabet==1)?SELECT_ALPHABET_1:SELECT_ALPHABET_2);
+		this->sendRawChar(BAUDOT_NULL);
+		this->sendRawChar((alphabet==1)?BAUDOT_ALPHABET_1:BAUDOT_ALPHABET_2);
+		this->sendRawChar((alphabet==1)?BAUDOT_ALPHABET_1:BAUDOT_ALPHABET_2);
     this->currentAlphabet=alphabet;
   }
-  printf("Print %c\n",data);
-  this->baudotSendChar(baudot);
+  this->sendRawChar(data);
+	this->printBaudotChar(data);
 }
 
 void telex::sendString(uint8_t *data, uint8_t filter)
@@ -273,69 +436,41 @@ void telex::sendString(uint8_t *data, uint8_t filter)
   uint16_t zz=0;
   while(data[zz])
   {
-		if (data[zz]=='\r')
-		{
-			printf("Ignoring carriage return\n");
-			zz++;
-			continue;
-		}
-
-		if (data[zz]=='\n')
-		{
-			printf("Inserting carriage return before line feed\n");
-			this->cursorPos=0;
-			this->sendChar('\r',filter);
-			usleep(20000);
-		}
 		this->sendChar(data[zz],filter);
     zz++;
-		// * = null
-		// % = bell
-		// $ = who are you?
-		// ~ = switch to letter alphabet (1)
-		// ^ = switch to digit alphabet (2)
-
-		if ((data[zz]!='*')&&(data[zz]!='%')&&(data[zz]!='~')&&(data[zz]!='^'))
-			this->cursorPos++;
-		if (this->cursorPos>=69) // insert extra line break if needed
-		{
-			printf("Inserting extra line break");
-			this->cursorPos=0;
-			this->sendChar('\n',filter);
-			usleep(20000);
-			this->sendChar('\r',filter);
-			usleep(20000);
-		}
-
-    usleep(20000);
   }
+	printf("\n");
 }
+
+uint8_t telex::receiveChar(uint8_t localEcho)
+{
+	if (!this->detectStartBit()) return 0;
+	return this->decodeBaudotChar(this->receiveRawChar(localEcho));
+}
+
 
 /*
 int main(void)
 {
 	uint8_t send[]={'^','^','^','a','b','c','d','e','f','g','h','~','~','i','j','k','l','m','n','4','4','4','4','4','4','o','p','q','r','s','t','u','v','w','x','y','z','1','2','3','4','5','6','7','8','9','0','(',')',0x0a,0x0d,0};
 	telex *t=new telex();
-	t->setPower(1);
-	usleep(4000000);
 	t->sendString(send,0);
-	usleep(2000000);
-	t->setPower(0);
-	return 0;
+//	t->setPower(0); // don't wait for power
 
-	while(1)
+	while(t->getPower())
 	{
-		if (t->detectStartBit())
+		uint8_t data=t->receiveChar(1);
+		if (data)
 		{
-			uint8_t data=t->baudotDecodeChar(t->baudotReceiveChar(1));
 			printf("%c\n",data);
 			if (data=='$')
 			{
 			  t->setPower(0);
-			  return 0;
 			}
 		}
+
 		usleep(100);
+		t->checkPowerTimeout();
 	}
 }
 */
