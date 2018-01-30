@@ -52,7 +52,7 @@
 #define KEEPALIVE_SECONDS 60
 
 /* Hostname and port for the MQTT broker. */
-#define BROKER_HOSTNAME "192.168.178.15"
+#define BROKER_HOSTNAME "http://luggage.dynds.tv:54378"
 #define BROKER_PORT 1883
 
 #define TELEX_INCOMING_FROM_SAT "telex/incoming-sat"
@@ -324,11 +324,13 @@ static bool connect(struct mosquitto *m) {
 /* Loop until it is explicitly halted or the network is lost, then clean up. */
 static int run_loop(struct client_info *info) {
 //    int res = mosquitto_loop_forever(info->m, 1000, 1 /* unused */);
+    int res;
+
     while(1)
     {
       // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
 
-      int res = mosquitto_loop(info->m, 1000, 1 /* unused */);
+      res = mosquitto_loop(info->m, 1000, 1 /* unused */);
 
       if(pDaTelex!=0) {
         pDaTelex->checkPowerTimeout();
