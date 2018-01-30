@@ -150,7 +150,7 @@ int main(int argc, char **argv)
     			g++;
     		}
     		t->sendString((uint8_t*)data,0);
-    		t->setPower(0);
+        t->setPower(0);
       }
       break;
     case 2:
@@ -184,8 +184,8 @@ int main(int argc, char **argv)
       {
         int keyStrokeCounter=0;
         printf("Listening for keyboard input\n");
-        while(t->getPower())
-    		{
+        do
+        {
     			if (t->detectStartBit())
     			{
             keyStrokeCounter++;
@@ -198,11 +198,11 @@ int main(int argc, char **argv)
           if ((number)&&(keyStrokeCounter>=number))
           {
             printf("Requested number (%d) of characters read from keyboard\n",number);
-            break;
+            t->setPower(0);
           }
           t->checkPowerTimeout();
     		}
-        t->setPower(0);
+        while(t->getPower());
       }
       break;
     case 4:

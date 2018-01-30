@@ -3,6 +3,7 @@
 
 #include <exception>
 #include <stdint.h>
+#include <time.h>
 
 class telexMemoryException: public std::exception
 {
@@ -35,7 +36,7 @@ class telex
 		static const uint8_t alphabet1[32];
 		static const uint8_t alphabet2[32];
 
-		uint8_t powerState;
+		time_t powerState;
 		uint8_t powerTimeout;
 		uint8_t currentAlphabet;
 		uint8_t cursorPos;

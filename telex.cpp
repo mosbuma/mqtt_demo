@@ -2,7 +2,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <time.h>
 #include "telex.h"
 
 //#include <sys/time.h>
@@ -94,7 +93,7 @@ telex::telex(uint8_t pinWriterOut, uint8_t pinKeyboardIn, uint8_t pinPowerContro
 	this->pinColorControl=pinColorControl; // output
 	INP_GPIO(this->pinColorControl);
 	OUT_GPIO(this->pinColorControl);
-	this->digitalWrite(this->pinWriterOut,0,0);
+	this->digitalWrite(this->pinColorControl,0,0);
 
 	usleep(500000);
 
@@ -158,8 +157,14 @@ void telex::setPowerTimout(void)
 
 uint8_t telex::checkPowerTimeout(void)
 {
+		//printf("Power timeout time=%d\n",this->powerTimeout);
+		//printf("Power state=%ld\n",this->powerState);
+		//printf("Time=%ld\n",time(NULL));
+		//printf("Diff=%d",(int)difftime(time(NULL),this->powerState));
+
 		if ((this->powerState)&&(difftime(time(NULL),this->powerState)>=this->powerTimeout))
 		{
+			printf("Power timeout -> cut power!\n");
 			this->setPower(0);
 			return 1;
 		}
@@ -259,38 +264,68 @@ uint8_t telex::isBaudotPrintChar(uint8_t data)
 
 void telex::printBaudotChar(uint8_t data)
 {
-	switch(data)
+	if (this->currentAlphabet==1)
 	{
-		case BAUDOT_CR:
-			printf("<CR>");
-			break;
-		case BAUDOT_LF:
-			printf("<LF>");
-			break;
-		case BAUDOT_BELL:
-			printf("<BELL>");
-			break;
-		case BAUDOT_NULL:
-			printf("<NULL>");
-			break;
-		case BAUDOT_ALPHABET_1:
-			printf("<ALPHABET1>");
-			break;
-		case BAUDOT_ALPHABET_2:
-			printf("<ALPHABET2>");
-			break;
-		case BAUDOT_NATIONAL_1:
-			printf("<NATIONAL1>");
-			break;
-		case BAUDOT_NATIONAL_2:
-			printf("<NATIONAL2>");
-			break;
-		case BAUDOT_NATIONAL_3:
-			printf("<NATIONAL3>");
-			break;
-		default:
-			printf("%c",this->decodeBaudotChar(data));
-			break;
+		switch(data)
+		{
+			case BAUDOT_NULL:
+				printf("<NULL>");
+				break;
+			case BAUDOT_CR:
+				printf("<CR>");
+				break;
+			case BAUDOT_LF:
+				printf("<LF>");
+				break;
+			case BAUDOT_ALPHABET_1:
+				printf("<ALPHABET1>");
+				break;
+			case BAUDOT_ALPHABET_2:
+				printf("<ALPHABET2>");
+				break;
+			default:
+				printf("%c",this->decodeBaudotChar(data));
+				break;
+		}
+	}
+	else
+	{
+		switch(data)
+		{
+			case BAUDOT_BELL:
+				printf("<BELL>");
+				break;
+			case BAUDOT_WRU:
+				printf("<WRU?>");
+				break;
+			case BAUDOT_NULL:
+				printf("<NULL>");
+				break;
+			case BAUDOT_CR:
+				printf("<CR>");
+				break;
+			case BAUDOT_LF:
+				printf("<LF>");
+				break;
+			case BAUDOT_ALPHABET_1:
+				printf("<ALPHABET1>");
+				break;
+			case BAUDOT_ALPHABET_2:
+				printf("<ALPHABET2>");
+				break;
+			case BAUDOT_NATIONAL_1:
+				printf("<NATIONAL1>");
+				break;
+			case BAUDOT_NATIONAL_2:
+				printf("<NATIONAL2>");
+				break;
+			case BAUDOT_NATIONAL_3:
+				printf("<NATIONAL3>");
+				break;
+			default:
+				printf("%c",this->decodeBaudotChar(data));
+				break;
+		}
 	}
 }
 
@@ -299,24 +334,38 @@ void telex::updateState(uint8_t data)
 	switch(data) // set current alphabet and update cursor position
 	{
 		case BAUDOT_LF:
-		case BAUDOT_BELL:
 		case BAUDOT_NULL:
+			//printf("No print char!\n");
 			break;
 		case BAUDOT_ALPHABET_1:
 		case BAUDOT_ALPHABET_2:
 			this->currentAlphabet=(data==BAUDOT_ALPHABET_1)?1:2;
+			//printf("Alphabet switched to %d\n",this->currentAlphabet);
 			break;
 		case BAUDOT_CR:
+			//printf("Reset cursor pos!\n");
 			this->cursorPos=0;
 			break;
+		case BAUDOT_BELL:
+			if (this->currentAlphabet==1)
+			{
+				//printf("Print char (increment)!\n");
+				this->cursorPos++;
+			}
+			else
+				//printf("No print char!\n");
+			break;
 		default:
+			//printf("Print char (increment)!\n");
 			this->cursorPos++;
 			break;
 	}
+	//printf("Current pos=%d\n",this->cursorPos);
 }
 
 void telex::sendRawChar(uint8_t data)
 {
+	uint8_t shift=data;
 	if (!this->getPower())
 		this->setPower(1);
 
@@ -324,8 +373,8 @@ void telex::sendRawChar(uint8_t data)
   usleep(SYMBOL_TIME);
   for (uint8_t zz=0;zz<5;zz++)
   {
-    this->digitalWrite(this->pinWriterOut,data&0x01);
-    data>>=1;
+    this->digitalWrite(this->pinWriterOut,shift&0x01);
+    shift>>=1;
     usleep(SYMBOL_TIME);
   }
   this->digitalWrite(this->pinWriterOut,1); // stopbit
@@ -334,6 +383,8 @@ void telex::sendRawChar(uint8_t data)
 	else
 		usleep(SYMBOL_TIME*1.5); // TODO: tweak this for optimum speed ... 1.5 stopbits?
 
+
+	this->printBaudotChar(data);printf("\n");
 	this->updateState(data);
 	this->setPowerTimout();
 }
@@ -414,7 +465,7 @@ void telex::sendChar(uint8_t data, uint8_t filter)
 		this->sendRawChar(BAUDOT_LF);
 		return;
 	}
-	if ((this->isBaudotPrintChar(data))&&(this->cursorPos>=79)) // 80 characters per line, automatically insert CR and LF on line end
+	if ((this->isBaudotPrintChar(data))&&(this->cursorPos>=69)) // 69 characters per line, automatically insert CR and LF on line end
 	{
 		printf("Inserting extra <CR><LF>\n");
 		this->sendRawChar(BAUDOT_CR); // insert <CR> before every <LF>
@@ -428,7 +479,6 @@ void telex::sendChar(uint8_t data, uint8_t filter)
     this->currentAlphabet=alphabet;
   }
   this->sendRawChar(data);
-	this->printBaudotChar(data);
 }
 
 void telex::sendString(uint8_t *data, uint8_t filter)
