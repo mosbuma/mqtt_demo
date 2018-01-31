@@ -270,38 +270,6 @@ static bool match(const char *topic, const char *key) {
     return 0 == strncmp(topic, key, strlen(key));
 }
 
-/* Handle a message that just arrived via one of the subscriptions. */
-static void on_message(struct mosquitto *m, void *udata,
-                       const struct mosquitto_message *msg) {
-    if (msg == NULL) { return; }
-
-    // printf("start message handler [%ld]\n", ++messagecounter);
-    // LOG("-- got message @ %s: (%d, QoS %d, %s) '%s'\n",
-    //     (char *) msg->topic, msg->payloadlen, msg->qos, msg->retain ? "R" : "!r",
-    //     (char *) msg->payload);
-
-//    struct client_info *info = (struct client_info *)udata;
-
-    if (match(msg->topic, TELEX_INCOMING_FROM_SAT)) {
-        std::string tmpstr = (char *) msg->payload;
-        messagequeue.push_back(tmpstr);
-    } else if (match(msg->topic, TELEX_CONTROL_ALL)) {
-        LOG("incoming from control: %s\n", (char *) msg->payload);
-        /* This will cover both "control/all" and "control/$(PID)".
-         * We won'st see "control/$(OTHER_PID)" because we won't be
-         * subscribed to them.*/
-        if (0 == strncmp((char *) msg->payload, "halt", msg->payloadlen)) {
-            LOG("*** halt\n");
-            (void)mosquitto_disconnect(m);
-        } else {
-          std::string base=(char *) msg->payload;
-          printf("Dummy Telex says: control message received '%s'\n", (char *) base.c_str());
-        }
-    }
-
-    // printf("end message handler\n");
-}
-
 /* Successful subscription hook. */
 static void on_subscribe(struct mosquitto *m, void *udata, int mid,
                          int qos_count, const int *granted_qos) {
@@ -332,6 +300,44 @@ static bool connect(struct mosquitto *m) {
     return res == MOSQ_ERR_SUCCESS;
 }
 
+/* Handle a message that just arrived via one of the subscriptions. */
+static void on_message(struct mosquitto *m, void *udata,
+                       const struct mosquitto_message *msg) {
+    if (msg == NULL) { return; }
+
+    if(messagequeue.size()>maxbuffer) {
+      unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size() - maxbuffer : 0;
+      printf('I threw away %ld items', ntoskip);
+      messagequeue.erase(0, ntoskip-1);
+    }
+
+    // printf("start message handler [%ld]\n", ++messagecounter);
+    // LOG("-- got message @ %s: (%d, QoS %d, %s) '%s'\n",
+    //     (char *) msg->topic, msg->payloadlen, msg->qos, msg->retain ? "R" : "!r",
+    //     (char *) msg->payload);
+
+//    struct client_info *info = (struct client_info *)udata;
+
+    if (match(msg->topic, TELEX_INCOMING_FROM_SAT)) {
+        std::string tmpstr = (char *) msg->payload;
+        messagequeue.push_back(tmpstr);
+    } else if (match(msg->topic, TELEX_CONTROL_ALL)) {
+        LOG("incoming from control: %s\n", (char *) msg->payload);
+        /* This will cover both "control/all" and "control/$(PID)".
+         * We won'st see "control/$(OTHER_PID)" because we won't be
+         * subscribed to them.*/
+        if (0 == strncmp((char *) msg->payload, "halt", msg->payloadlen)) {
+            LOG("*** halt\n");
+            (void)mosquitto_disconnect(m);
+        } else {
+          std::string base=(char *) msg->payload;
+          printf("Dummy Telex says: control message received '%s'\n", (char *) base.c_str());
+        }
+    }
+
+    // printf("end message handler\n");
+}
+
 /* Loop until it is explicitly halted or the network is lost, then clean up. */
 static int run_loop(struct client_info *info) {
 //    int res = mosquitto_loop_forever(info->m, 1000, 1 /* unused */);
@@ -341,46 +347,36 @@ static int run_loop(struct client_info *info) {
     {
       // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
 
-      printf("loop start\n");
-      unsigned long lastcount=0;
-      unsigned int maxloops=25;
-      do {
-        lastcount = messagequeue.size();
-        res = mosquitto_loop(info->m, 100, 1 /* unused */);
-        printf("%i/", res);
-      } while (lastcount!=messagequeue.size()&&--maxloops>0);
-      printf(" - loop end\n");
+      res = mosquitto_loop(info->m, 100, 1 /* unused */);
 
       if(pDaTelex!=0) {
         pDaTelex->checkPowerTimeout();
       }
 
-      unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size()- maxbuffer : 0;
-      printf("== skip %ld of %ld lines ==\n", (messagequeue.size()-ntoskip), messagequeue.size());
-      if(ntoskip>0) {
-        // pDaTelex->sendString((uint8_t*) sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint)));
-        char tmpstr[100];
-        sprintf(tmpstr, "== skipping %ld lines ==\n", ntoskip);
-        if(pDaTelex!=0) {
-          printf("sending %s to telex\n", tmpstr);
-          pDaTelex->sendString((uint8_t*) tmpstr);
-          pDaTelex->sendString((uint8_t*)"\n");
-          printf("done sending %s to telex\n", tmpstr);
-        } else {
-          std::string printmessage = tmpstr;
-          for (std::string::iterator c = printmessage.begin(); c!=printmessage.end(); ++c) {
-            std::cout << *c << std::flush;
-            usleep(1000*1000/SIM_BAUDRATE);
-          }
-          std::cout << std::endl;
-        }
-      }
+      // unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size()- maxbuffer : 0;
+      // printf("== skip %ld of %ld lines ==\n", (messagequeue.size()-ntoskip), messagequeue.size());
+      // if(ntoskip>0) {
+      //   // pDaTelex->sendString((uint8_t*) sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint)));
+      //   char tmpstr[100];
+      //   sprintf(tmpstr, "== skipping %ld lines ==\n", ntoskip);
+      //   if(pDaTelex!=0) {
+      //     printf("sending %s to telex\n", tmpstr);
+      //     pDaTelex->sendString((uint8_t*) tmpstr);
+      //     pDaTelex->sendString((uint8_t*)"\n");
+      //     printf("done sending %s to telex\n", tmpstr);
+      //   } else {
+      //     std::string printmessage = tmpstr;
+      //     for (std::string::iterator c = printmessage.begin(); c!=printmessage.end(); ++c) {
+      //       std::cout << *c << std::flush;
+      //       usleep(1000*1000/SIM_BAUDRATE);
+      //     }
+      //     std::cout << std::endl;
+      //   }
+      // }
 
-      for(unsigned long index=ntoskip;index<messagequeue.size();index++) {
-        std::string printmessage = messagequeue[index];
-        // if(printmessage.length()>60) {
-        //   printmessage = printmessage.substr(0, 57).append("...");
-        // }
+      if(messagequeue.size>0) {
+        std::string printmessage = messagequeue[0];
+        messagequeue.erase(0);
 
         if(printmessage.length()>0) {
           if(pDaTelex!=0) {
@@ -398,6 +394,7 @@ static int run_loop(struct client_info *info) {
 
       messagequeue.clear();
     }
+    
     mosquitto_destroy(info->m);
     (void)mosquitto_lib_cleanup();
 
