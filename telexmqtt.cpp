@@ -296,7 +296,7 @@ static void on_message(struct mosquitto *m, void *udata,
                        const struct mosquitto_message *msg) {
     if (msg == NULL) { return; }
 
-    printf("Received a message\n");
+    printf("Received "%s"\n", (char *) msg->payload);
 
     if(messagequeue.size()>maxbuffer) {
       unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size() - maxbuffer : 0;
@@ -349,9 +349,6 @@ static int run_loop(struct client_info *info) {
 
     while(1)
     {
-      // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
-
-      // res = mosquitto_loop(info->m, 1, 1 /* unused */);
       unsigned long lastcount=0;
       unsigned int maxloops=25;
       do {
@@ -363,35 +360,12 @@ static int run_loop(struct client_info *info) {
             printf("unable to connect to MQTT broker. Will retry in 60 seconds\n");
             sleep(60);
           }
-        } else {
-          printf("+");
         }
       } while (lastcount!=messagequeue.size()&&--maxloops>0);
-      printf("\n");
 
       if(pDaTelex!=0) {
         pDaTelex->checkPowerTimeout();
       }
-
-      // unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size()- maxbuffer : 0;
-      // if(ntoskip>0) {
-      //   // pDaTelex->sendString((uint8_t*) sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint)));
-      //   char tmpstr[100];
-      //   sprintf(tmpstr, "== skipping %ld lines ==\n", ntoskip);
-      //   if(pDaTelex!=0) {
-      //     printf("sending %s to telex\n", tmpstr);
-      //     pDaTelex->sendString((uint8_t*) tmpstr);
-      //     pDaTelex->sendString((uint8_t*)"\n");
-      //     printf("done sending %s to telex\n", tmpstr);
-      //   } else {
-      //     std::string printmessage = tmpstr;
-      //     for (std::string::iterator c = printmessage.begin(); c!=printmessage.end(); ++c) {
-      //       std::cout << *c << std::flush;
-      //       usleep(1000*1000/SIM_BAUDRATE);
-      //     }
-      //     std::cout << std::endl;
-      //   }
-      // }
 
       if(messagequeue.size()>0) {
         std::string printmessage = messagequeue[0];
