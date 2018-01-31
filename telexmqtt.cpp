@@ -357,14 +357,14 @@ static int run_loop(struct client_info *info) {
       do {
         lastcount = messagequeue.size();
         res = mosquitto_loop(info->m, 100, 1 /* unused */);
-        if(res==14) {
+        if(res!=0) {
           printf("connection to MQTT broker lost (%d). Attempting reconnect", res);
           if (!connect(m)) {
             printf("unable to connect to MQTT broker. Will retry in 60 seconds\n");
             sleep(60);
           }
         } else {
-          printf("+", res);
+          printf("+");
         }
       } while (lastcount!=messagequeue.size()&&--maxloops>0);
       printf("\n");
