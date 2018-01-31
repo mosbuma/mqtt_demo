@@ -26,12 +26,83 @@ while true; do
 #    echo +++ yet another interesting message 2 +++
 #    echo +++ yet another interesting message 3 +++
 #    echo +++ yet another interesting message 4 +++
-    echo +++ chirp, chirp, chirp
-    echo +++ hello from space, TTN!
-    echo +++ TTNSAT calling here
-    echo +++ thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech
-    echo +++ let\'s build this thing together
-    echo +++ the secret code is 384206
-    echo +++ goodbye!
-    sleep $interval
+    # echo +++ chirp, chirp, chirp
+    # echo +++ hello from space, TTN!
+    # echo +++ TTNSAT calling here
+    # echo +++ thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech
+    # echo +++ let\'s build this thing together
+    # echo +++ the secret code is 384206
+    # echo +++ goodbye!
+    sleep 0 && echo "2018-01-31 10:37:08 UTC: chirp, chirp, chirp"
+    sleep 1 && echo "2018-01-31 10:37:09 UTC: hello from space, TTN!"
+    sleep 1 && echo "2018-01-31 10:37:10 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:37:12 UTC: CRC error"
+    sleep 16 && echo "2018-01-31 10:37:28 UTC: chirp, chirp, chirpT"
+    sleep 1 && echo "2018-01-31 10:37:29 UTC: hello from space, TTN!"
+    sleep 1 && echo "2018-01-31 10:37:30 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:37:32 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:37:33 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:37:35 UTC: the secret code is XXXXXXg"
+    sleep 0 && echo "2018-01-31 10:37:35 UTC: goodbye!e"
+    sleep 13 && echo "2018-01-31 10:37:48 UTC: chirp, chirp, chirp3"
+    sleep 1 && echo "2018-01-31 10:37:49 UTC: hello from space, TTN!2"
+    sleep 1 && echo "2018-01-31 10:37:50 UTC: CRC error"
+    sleep 5 && echo "2018-01-31 10:37:55 UTC: goodbye!r"
+    sleep 14 && echo "2018-01-31 10:38:09 UTC: hello from space, TTN!2"
+    sleep 3 && echo "2018-01-31 10:38:12 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:38:13 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:38:15 UTC: the secret code is XXXXXXg"
+    sleep 0 && echo "2018-01-31 10:38:15 UTC: goodbye!e"
+    sleep 13 && echo "2018-01-31 10:38:28 UTC: CRC error"
+    sleep 20 && echo "2018-01-31 10:38:48 UTC: chirp, chirp, chirp3"
+    sleep 1 && echo "2018-01-31 10:38:49 UTC: hello from space, TTN!2"
+    sleep 1 && echo "2018-01-31 10:38:50 UTC: CRC error"
+    sleep 3 && echo "2018-01-31 10:38:53 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:38:55 UTC: the secret code is XXXXXXg"
+    sleep 0 && echo "2018-01-31 10:38:55 UTC: goodbye!e"
+    sleep 13 && echo "2018-01-31 10:39:08 UTC: chirp, chirp, chirp3"
+    sleep 1 && echo "2018-01-31 10:39:09 UTC: hello from space, TTN!2"
+    sleep 1 && echo "2018-01-31 10:39:10 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:39:12 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:39:13 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:39:15 UTC: the secret code is XXXXXXg"
+    sleep 0 && echo "2018-01-31 10:39:15 UTC: goodbye!e"
+    sleep 13 && echo "2018-01-31 10:39:28 UTC: chirp, chirp, chirp3"
+    sleep 1 && echo "2018-01-31 10:39:29 UTC: hello from space, TTN!2"
+    sleep 1 && echo "2018-01-31 10:39:30 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:39:32 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:39:33 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:39:35 UTC: CRC error"
+    sleep 14 && echo "2018-01-31 10:39:49 UTC: hello from space, TTN!"
+    sleep 1 && echo "2018-01-31 10:39:50 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:39:52 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:39:53 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:39:55 UTC: goodbye!i"
+    sleep 13 && echo "2018-01-31 10:40:08 UTC: chirp, chirp, chirpi"
+    sleep 1 && echo "2018-01-31 10:40:09 UTC: hello from space, TTN!"
+    sleep 1 && echo "2018-01-31 10:40:10 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:40:12 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:40:13 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:40:15 UTC: the secret code is XXXXXXg"
+    sleep 0 && echo "2018-01-31 10:40:15 UTC: goodbye!e"
+    sleep 13 && echo "2018-01-31 10:40:28 UTC: chirp, chirp, chirp3"
+    sleep 1 && echo "2018-01-31 10:40:29 UTC: hello from space, TTN!2"
+    sleep 1 && echo "2018-01-31 10:40:30 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:40:32 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:40:33 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:40:35 UTC: the secret code is XXXXXXg"
+    sleep 0 && echo "2018-01-31 10:40:35 UTC: goodbye!e"
+    sleep 13 && echo "2018-01-31 10:40:48 UTC: chirp, chirp, chirp3"
+    sleep 1 && echo "2018-01-31 10:40:49 UTC: hello from space, TTN!2"
+    sleep 1 && echo "2018-01-31 10:40:50 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:40:52 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:40:53 UTC: let\'s build this thing togetherr"
+    sleep 2 && echo "2018-01-31 10:40:55 UTC: CRC error"
+    sleep 13 && echo "2018-01-31 10:41:08 UTC: chirp, chirp, chirpi"
+    sleep 1 && echo "2018-01-31 10:41:09 UTC: hello from space, TTN!"
+    sleep 1 && echo "2018-01-31 10:41:10 UTC: TTNSAT calling hereT"
+    sleep 2 && echo "2018-01-31 10:41:12 UTC: thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech"
+    sleep 1 && echo "2018-01-31 10:41:13 UTC: CRC error"
+    sleep 2 && echo "2018-01-31 10:41:15 UTC: go��\"ye!r"
+    sleep 20 && echo "2018-01-31 10:41:35 UTC: goodbye!r"
 done | mosquitto_pub -l -t "telex/incoming-sat/" -h $mqttserver -p $mqttport

@@ -84,7 +84,6 @@ static void print_usage(const char *prog)
        "  -u --user : mqtt username (omit to login anonymously)\n"
        "  -P --pass : mqtt password\n"
        "  -d --dummy : dummy telex mode: send messages to console\n"
-       "  -w --wrap : set auto text wrap at X cnaracters \n"
        "  -b --buffer : set line buffer at X lines \n"
   		 "  -h --help : display this message\n");
 	exit(1);
@@ -101,8 +100,6 @@ unsigned long maxbuffer=10;
 char *username;
 char *password;
 
-int wrap = 60;
-
 static void parse_opts(int argc, char *argv[])
 {
 	static const struct option lopts[] = {
@@ -111,7 +108,6 @@ static void parse_opts(int argc, char *argv[])
     { "dummy", no_argument, 0, 'd' },
     { "user", no_argument, 0, 'u' },
     { "pass", no_argument, 0, 'P' },
-    { "wrap", no_argument, 0, 'w' },
     { "buffer", no_argument, 0, 'b' },
 		{ "help", no_argument, 0, 'h' },
 		{ NULL, 0, 0, 0 }
@@ -121,7 +117,7 @@ static void parse_opts(int argc, char *argv[])
 
 	while (1)
 	{
-		c = getopt_long(argc, argv, "n:p:u:P:dw:b:h", lopts, NULL);
+		c = getopt_long(argc, argv, "n:p:u:P:db:h", lopts, NULL);
 		if (c==-1)
 		{
       if(hostname==0||port==0) {
@@ -149,9 +145,6 @@ static void parse_opts(int argc, char *argv[])
 				break;
       case 'P':
         password=optarg;
-				break;
-      case 'w':
-        wrap=atoi(optarg);
 				break;
       case 'b':
         maxbuffer=atoi(optarg);
@@ -348,25 +341,31 @@ static int run_loop(struct client_info *info) {
     {
       // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
 
+      printf("loop start\n");
       unsigned long lastcount=0;
+      unsigned int maxloops=25;
       do {
         lastcount = messagequeue.size();
         res = mosquitto_loop(info->m, 50, 1 /* unused */);
-      } while (lastcount!=messagequeue.size());
+        printf("+");
+      } while (lastcount!=messagequeue.size()&&--maxloops>0);
+      printf(" - loop end\n");
 
       if(pDaTelex!=0) {
         pDaTelex->checkPowerTimeout();
       }
 
       unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size()- maxbuffer : 0;
+      printf("== skip %ld of %ld lines ==\n", (messagequeue.size()-ntoskip), messagequeue.size());
       if(ntoskip>0) {
-        // sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint));
         // pDaTelex->sendString((uint8_t*) sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint)));
         char tmpstr[100];
         sprintf(tmpstr, "== skipping %ld lines ==\n", ntoskip);
         if(pDaTelex!=0) {
+          printf("sending %s to telex\n", tmpstr);
           pDaTelex->sendString((uint8_t*) tmpstr);
           pDaTelex->sendString((uint8_t*)"\n");
+          printf("done sending %s to telex\n", tmpstr);
         } else {
           std::string printmessage = tmpstr;
           for (std::string::iterator c = printmessage.begin(); c!=printmessage.end(); ++c) {
@@ -379,9 +378,9 @@ static int run_loop(struct client_info *info) {
 
       for(unsigned long index=ntoskip;index<messagequeue.size();index++) {
         std::string printmessage = messagequeue[index];
-        if(printmessage.length()>60) {
-          printmessage = printmessage.substr(0, 57).append("...");
-        }
+        // if(printmessage.length()>60) {
+        //   printmessage = printmessage.substr(0, 57).append("...");
+        // }
 
         if(printmessage.length()>0) {
           if(pDaTelex!=0) {
