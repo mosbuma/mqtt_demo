@@ -275,7 +275,7 @@ void telex::printBaudotChar(uint8_t data)
 				printf("<CR>");
 				break;
 			case BAUDOT_LF:
-				printf("<LF>");
+				printf("<LF>\n");
 				break;
 			case BAUDOT_ALPHABET_1:
 				printf("<ALPHABET1>");
@@ -305,7 +305,7 @@ void telex::printBaudotChar(uint8_t data)
 				printf("<CR>");
 				break;
 			case BAUDOT_LF:
-				printf("<LF>");
+				printf("<LF>\n");
 				break;
 			case BAUDOT_ALPHABET_1:
 				printf("<ALPHABET1>");
@@ -384,7 +384,7 @@ void telex::sendRawChar(uint8_t data)
 		usleep(SYMBOL_TIME*1.5); // TODO: tweak this for optimum speed ... 1.5 stopbits?
 
 
-	this->printBaudotChar(data);printf("\n");
+	this->printBaudotChar(data);
 	this->updateState(data);
 	this->setPowerTimout();
 }
@@ -455,7 +455,7 @@ void telex::sendChar(uint8_t data, uint8_t filter)
 
 	if (data==BAUDOT_CR)
 	{
-		printf("Ignoring <CR>\n");
+		//printf("Ignoring <CR>\n");
 		return; // ignore <CR>, as it is added to <LF> automatically
 	}
 	if (data==BAUDOT_LF)
