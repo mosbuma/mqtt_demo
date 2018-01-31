@@ -346,8 +346,8 @@ static int run_loop(struct client_info *info) {
       unsigned int maxloops=25;
       do {
         lastcount = messagequeue.size();
-        res = mosquitto_loop(info->m, 50, 1 /* unused */);
-        printf("+");
+        res = mosquitto_loop(info->m, 100, 1 /* unused */);
+        printf("%i/", res);
       } while (lastcount!=messagequeue.size()&&--maxloops>0);
       printf(" - loop end\n");
 
