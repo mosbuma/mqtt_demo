@@ -352,7 +352,6 @@ static int run_loop(struct client_info *info) {
       // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
 
       // res = mosquitto_loop(info->m, 1, 1 /* unused */);
-      printf("loop start ->");
       unsigned long lastcount=0;
       unsigned int maxloops=25;
       do {
@@ -365,10 +364,10 @@ static int run_loop(struct client_info *info) {
             sleep(60);
           }
         } else {
-          printf("%i/", res);
+          printf("+", res);
         }
       } while (lastcount!=messagequeue.size()&&--maxloops>0);
-      printf(" - loop end\n");
+      printf("\n");
 
       if(pDaTelex!=0) {
         pDaTelex->checkPowerTimeout();
