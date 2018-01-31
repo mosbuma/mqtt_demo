@@ -282,17 +282,6 @@ void on_log(struct mosquitto *mosq, void *userdata, int level, const char *str)
   LOG("-- LOG[l %d]: %s\n", level, str);
 }
 
-/* Register the callbacks that the mosquitto connection will use. */
-static bool set_callbacks(struct mosquitto *m) {
-    mosquitto_connect_callback_set(m, on_connect);
-    mosquitto_publish_callback_set(m, on_publish);
-    mosquitto_subscribe_callback_set(m, on_subscribe);
-    mosquitto_message_callback_set(m, on_message);
-//    mosquitto_log_callback_set(m, on_log);
-
-    return true;
-}
-
 /* Connect to the network. */
 static bool connect(struct mosquitto *m) {
 //    int res = mosquitto_connect(m, BROKER_HOSTNAME, BROKER_PORT, KEEPALIVE_SECONDS);
@@ -305,10 +294,12 @@ static void on_message(struct mosquitto *m, void *udata,
                        const struct mosquitto_message *msg) {
     if (msg == NULL) { return; }
 
+    printf("Received a message\n");
+
     if(messagequeue.size()>maxbuffer) {
       unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size() - maxbuffer : 0;
-      printf('I threw away %ld items', ntoskip);
-      messagequeue.erase(0, ntoskip-1);
+      printf("I threw away %ld items\n", ntoskip);
+      messagequeue.erase(messagequeue.begin(), messagequeue.begin() + ntoskip-1);
     }
 
     // printf("start message handler [%ld]\n", ++messagecounter);
@@ -335,7 +326,18 @@ static void on_message(struct mosquitto *m, void *udata,
         }
     }
 
-    // printf("end message handler\n");
+    printf("end message handler (queue of %ld messages)\n", messagequeue.size());
+}
+
+/* Register the callbacks that the mosquitto connection will use. */
+static bool set_callbacks(struct mosquitto *m) {
+    mosquitto_connect_callback_set(m, on_connect);
+    mosquitto_publish_callback_set(m, on_publish);
+    mosquitto_subscribe_callback_set(m, on_subscribe);
+    mosquitto_message_callback_set(m, on_message);
+//    mosquitto_log_callback_set(m, on_log);
+
+    return true;
 }
 
 /* Loop until it is explicitly halted or the network is lost, then clean up. */
@@ -347,14 +349,22 @@ static int run_loop(struct client_info *info) {
     {
       // TODO: reconnect in case connection was lost (this is done automatically in mosquitto_loop_forever)
 
-      res = mosquitto_loop(info->m, 100, 1 /* unused */);
+      // res = mosquitto_loop(info->m, 1, 1 /* unused */);
+      printf("loop start ->");
+      unsigned long lastcount=0;
+      unsigned int maxloops=25;
+      do {
+        lastcount = messagequeue.size();
+        res = mosquitto_loop(info->m, 1000, 1 /* unused */);
+        printf("%i/", res);
+      } while (lastcount!=messagequeue.size()&&--maxloops>0);
+      printf(" - loop end\n");
 
       if(pDaTelex!=0) {
         pDaTelex->checkPowerTimeout();
       }
 
       // unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size()- maxbuffer : 0;
-      // printf("== skip %ld of %ld lines ==\n", (messagequeue.size()-ntoskip), messagequeue.size());
       // if(ntoskip>0) {
       //   // pDaTelex->sendString((uint8_t*) sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint)));
       //   char tmpstr[100];
@@ -374,9 +384,9 @@ static int run_loop(struct client_info *info) {
       //   }
       // }
 
-      if(messagequeue.size>0) {
+      if(messagequeue.size()>0) {
         std::string printmessage = messagequeue[0];
-        messagequeue.erase(0);
+        messagequeue.erase(messagequeue.begin());
 
         if(printmessage.length()>0) {
           if(pDaTelex!=0) {
@@ -391,10 +401,8 @@ static int run_loop(struct client_info *info) {
           }
         }
       }
-
-      messagequeue.clear();
     }
-    
+
     mosquitto_destroy(info->m);
     (void)mosquitto_lib_cleanup();
 
