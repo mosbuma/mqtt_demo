@@ -351,7 +351,7 @@ static int run_loop(struct client_info *info) {
       unsigned long lastcount=0;
       do {
         lastcount = messagequeue.size();
-        res = mosquitto_loop(info->m, 1, 1 /* unused */);
+        res = mosquitto_loop(info->m, 50, 1 /* unused */);
       } while (lastcount!=messagequeue.size());
 
       if(pDaTelex!=0) {
