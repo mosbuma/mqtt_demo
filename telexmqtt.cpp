@@ -51,7 +51,7 @@ using namespace std;
 
 /* How many seconds the broker should wait between sending out
  * keep-alive messages. */
-#define KEEPALIVE_SECONDS 10
+#define KEEPALIVE_SECONDS 180
 
 /* Hostname and port for the MQTT broker. */
 #define BROKER_HOSTNAME "http://luggage.dynds.tv:54378"
