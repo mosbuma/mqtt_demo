@@ -22,6 +22,9 @@ fi
 echo "sending messages to to $mqttserver:$mqttport"
 
 while true; do
-    echo +++ yet another interesting message +++
+    echo +++ yet another interesting message 1 +++ \n
+    echo +++ yet another interesting message 2 +++ \n
+    echo +++ yet another interesting message 3 +++ \n
+    echo +++ yet another interesting message 4 +++ \n 
     sleep $interval
 done | mosquitto_pub -l -t "telex/incoming-sat/" -h $mqttserver -p $mqttport
