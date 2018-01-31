@@ -362,11 +362,13 @@ static int run_loop(struct client_info *info) {
       if(ntoskip>0) {
         // sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint));
         // pDaTelex->sendString((uint8_t*) sprintf("== skip %ld lines ==\n", (messagequeue.size()-ntoprint)));
-        std::string printmessage = "== skipping X lines ==";
+        char tmpstr[100];
+        sprintf(tmpstr, "== skipping %ld lines ==\n", ntoskip);
         if(pDaTelex!=0) {
-          pDaTelex->sendString((uint8_t*) printmessage.c_str());
-          // pDaTelex->sendString((uint8_t*)"\n");
+          pDaTelex->sendString((uint8_t*) tmpstr);
+          pDaTelex->sendString((uint8_t*)"\n");
         } else {
+          std::string printmessage = tmpstr;
           for (std::string::iterator c = printmessage.begin(); c!=printmessage.end(); ++c) {
             std::cout << *c << std::flush;
             usleep(1000*1000/SIM_BAUDRATE);

@@ -22,9 +22,16 @@ fi
 echo "sending messages to to $mqttserver:$mqttport"
 
 while true; do
-    echo +++ yet another interesting message 1 +++ \n
-    echo +++ yet another interesting message 2 +++ \n
-    echo +++ yet another interesting message 3 +++ \n
-    echo +++ yet another interesting message 4 +++ \n 
+#    echo +++ yet another interesting message 1 +++
+#    echo +++ yet another interesting message 2 +++
+#    echo +++ yet another interesting message 3 +++
+#    echo +++ yet another interesting message 4 +++
+    echo +++ chirp, chirp, chirp
+    echo +++ hello from space, TTN!
+    echo +++ TTNSAT calling here
+    echo +++ thanks to ESA, Space Norway, Norwegian Space Centre, and Semtech
+    echo +++ let\'s build this thing together
+    echo +++ the secret code is 384206
+    echo +++ goodbye!
     sleep $interval
 done | mosquitto_pub -l -t "telex/incoming-sat/" -h $mqttserver -p $mqttport
