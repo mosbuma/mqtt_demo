@@ -164,7 +164,7 @@ uint8_t telex::checkPowerTimeout(void)
 
 		if ((this->powerState)&&(difftime(time(NULL),this->powerState)>=this->powerTimeout))
 		{
-			printf("Power timeout -> cut power!\n");
+			printf("[Power timeout -> cut power!]\n");
 			this->setPower(0);
 			return 1;
 		}
@@ -460,14 +460,14 @@ void telex::sendChar(uint8_t data, uint8_t filter)
 	}
 	if (data==BAUDOT_LF)
 	{
-		printf("Translating <LF> to <CR><LF>\n");
+		printf("[Translating <LF> to <CR><LF>]\n");
 		this->sendRawChar(BAUDOT_CR); // insert <CR> before every <LF>
 		this->sendRawChar(BAUDOT_LF);
 		return;
 	}
 	if ((this->isBaudotPrintChar(data))&&(this->cursorPos>=69)) // 69 characters per line, automatically insert CR and LF on line end
 	{
-		printf("Inserting extra <CR><LF>\n");
+		printf("[Inserting extra <CR><LF>]\n");
 		this->sendRawChar(BAUDOT_CR); // insert <CR> before every <LF>
 		this->sendRawChar(BAUDOT_LF);
 	}
