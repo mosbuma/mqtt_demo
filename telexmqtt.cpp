@@ -51,7 +51,7 @@ using namespace std;
 
 /* How many seconds the broker should wait between sending out
  * keep-alive messages. */
-#define KEEPALIVE_SECONDS 60
+#define KEEPALIVE_SECONDS 10
 
 /* Hostname and port for the MQTT broker. */
 #define BROKER_HOSTNAME "http://luggage.dynds.tv:54378"
@@ -173,6 +173,8 @@ void cleanup_resources ()
   }
 }
 
+struct mosquitto *m = 0;
+
 int main(int argc, char **argv) {
     atexit (cleanup_resources);
     signal(SIGINT, handle_signal); // catch ctrl+c for cleanup
@@ -199,7 +201,7 @@ int main(int argc, char **argv) {
     memset(&info, 0, sizeof(info));
     info.pid = pid;
 
-    struct mosquitto *m = init(&info);
+    m = init(&info);
 
     if (m == NULL) { die("init() failure\n"); }
     info.m = m;
@@ -356,6 +358,13 @@ static int run_loop(struct client_info *info) {
       do {
         lastcount = messagequeue.size();
         res = mosquitto_loop(info->m, 1000, 1 /* unused */);
+        printf("%i/", res);
+        if(res==14) {
+          if (!connect(m)) {
+            printf("unable to connect to MQTT broker. Will retry in 60 seconds\n");
+            sleep(60);
+          }
+        }
         printf("%i/", res);
       } while (lastcount!=messagequeue.size()&&--maxloops>0);
       printf(" - loop end\n");
