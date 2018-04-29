@@ -61,7 +61,7 @@ using namespace std;
 #define TELEX_CONTROL_ALL "telex/control/all"
 #define TELEX_CONTROL_PID "telex/control/%d"
 
-#define SIM_BAUDRATE 5    // 5 characters / second
+#define SIM_BAUDRATE 7    // 7 characters / second
 
 struct client_info {
     struct mosquitto *m;
@@ -296,7 +296,7 @@ static void on_message(struct mosquitto *m, void *udata,
                        const struct mosquitto_message *msg) {
     if (msg == NULL) { return; }
 
-    printf("Received "%s"\n", (char *) msg->payload);
+    printf("Received '%s'\n", (char *) msg->payload);
 
     if(messagequeue.size()>maxbuffer) {
       unsigned long ntoskip = messagequeue.size() > maxbuffer ? messagequeue.size() - maxbuffer : 0;
